@@ -3,25 +3,32 @@ from os.path import isfile, join
 from scipy import fftpack, ndimage
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
-
+np.set_printoptions(threshold=np.nan)
 def readTrainingSet():
-    training = 'fruits-360/Test'
-    images = []
+    paths = []
+    training = 'fruits-360/Training'
     for className in listdir(training):
         classDir = training + '/' + className
         for filename in listdir(classDir):
             path = classDir + '/' + filename
-            images.append((transformImage(ndimage.imread(path)), className))
+            paths.append((path, className))
+    return paths
 
-def transformImage(image):
+def getImages(paths):
+    images = []
+    for (path, className) in paths:
+        images.append((transformImage(ndimage.imread(path), className)))
+    return images
+
+def transformImage(images):
     result = np.zeros((100, 100, 6))
     for i in range(3):
         fft = np.fft.fft2(image[:, :, i])
         fshift = np.fft.fftshift(fft)
-        result[:, :, 2 * i] = fft.real
-        result[:, :, 2 * i + 1] = fft.imag
+        result[:, :, 2 * i] = fshift.real
+        result[:, :, 2 * i + 1] = fshift.imag
     return result
 
-
-readTrainingSet()
+print (readTrainingSet())
