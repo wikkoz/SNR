@@ -82,6 +82,8 @@ print(max_amplitude, max_phase)
 """
 
 batch_size=100
+samples = np.ceil(len(files) / batch_size)
+
 def generate_arrays_from_files(files2):
     print(len(files2))
     batch_features = np.zeros((batch_size, 100, 100, 6))
@@ -110,8 +112,36 @@ model.compile(optimizer=tf.train.AdamOptimizer(),
               metrics=['accuracy'])
 
 
-model.fit_generator(generate_arrays_from_files(files), samples_per_epoch=10000, epochs=5)
+model.fit_generator(generate_arrays_from_files(files), samples_per_epoch=samples, epochs=3)
 model.save('my_model.h5')
+
+
+files = readSet('fruits-360/Test')
+test_size = int(len(files)/2)
+test_set = files[:test_size]
+valid_set = files[test_size:]
+
+test_images, test_labels = zip(*test_set)
+
+batch_size=100
+def generate_arrays_from_files():
+    print(len(test_set))
+    i = 0
+    while i < len(files):
+        print(i)
+        batch_features = np.zeros((batch_size, 100, 100, 6))
+        batch_labels = np.zeros((batch_size, 1))
+        j = 0
+        while j < batch_size and i < len(files):
+            file, clas = files[i]
+            batch_features[j] = preprocess_image(file)
+            batch_labels[j] = clas
+            i += 1
+            j += 1
+        yield (batch_features, batch_labels)
+
+test_loss, test_acc = model.evaluate_generator(generate_arrays_from_files(), steps=int(len(files)/batch_size))
+print('Test accuracy:', test_acc)
 
 
 
