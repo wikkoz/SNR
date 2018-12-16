@@ -14,7 +14,7 @@ from keras.models import load_model
  
 def readSet(dir):
     files = []
-    for i, className in enumerate(listdir(dir)):
+    for i, className in enumerate(sorted(listdir(dir))):
         if className == '.DS_Store':
             continue
         ind = classesToIds[className]
@@ -66,11 +66,6 @@ with open(classesToIdsFile, 'rb') as handle:
  
 with open(idsToClassesFile, 'rb') as handle:
     idsToClasses = pickle.load(handle)
- 
-
-
-
-
 
 def generate_arrays_from_files(files2):
     batch_features = np.zeros((batch_size, 100, 100, 6))
@@ -101,3 +96,13 @@ model.compile(optimizer=tf.train.AdamOptimizer(),
  
 model.fit_generator(generate_arrays_from_files(files), samples_per_epoch=samples*2, epochs=2000)
 model.save('my_model.h5')
+
+files = readSet('fruits-360/Test')
+test_size = int(len(files)/2)
+test_set = files[:test_size]
+valid_set = files[test_size:]
+
+test_images, test_labels = zip(*test_set)
+
+test_loss, test_acc = model.evaluate(test_images, test_labels)
+print('Test accuracy:', test_acc)
