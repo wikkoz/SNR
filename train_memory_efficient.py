@@ -10,6 +10,7 @@ import keras
 import tensorflow as tf
 import os.path
 import random
+import resnet
 from keras.models import load_model
 
 
@@ -60,14 +61,14 @@ def readSet(dir):
 files = readSet('fruits-360/Training')
 
 def preprocess_image(file):
-    image = ndimage.imread(file)
-    result_amplitude = np.zeros((100, 100, 6))
-    for i in range(3):
-        fft = np.fft.fft2(image[:, :, i])
-        fshift = np.fft.fftshift(fft)
-        result_amplitude[:, :, i] = np.abs(fshift) / 2445836.0
-        result_amplitude[:, :, 3+i] = np.angle(fshift) / 3.14
-    return result_amplitude
+    return ndimage.imread(file)
+    # result_amplitude = np.zeros((100, 100, 6))
+    # for i in range(3):
+    #     fft = np.fft.fft2(image[:, :, i])
+    #     fshift = np.fft.fftshift(fft)
+    #     result_amplitude[:, :, i] = np.abs(fshift) / 2445836.0
+    #     result_amplitude[:, :, 3+i] = np.angle(fshift) / 3.14
+    # return result_amplitude
 
 """
 max_amplitude = 0
@@ -86,7 +87,7 @@ samples = np.ceil(len(files) / batch_size)
 
 def generate_arrays_from_files(files2):
     print(len(files2))
-    batch_features = np.zeros((batch_size, 100, 100, 6))
+    batch_features = np.zeros((batch_size, 100, 100, 3))
     batch_labels = np.zeros((batch_size, 1))
 
     while 1:
@@ -99,13 +100,16 @@ def generate_arrays_from_files(files2):
         yield (batch_features, batch_labels)
 
 
-model = keras.Sequential([
-    keras.layers.Flatten(input_shape=(100, 100, 6)),
-    keras.layers.Dense(2048, activation=tf.nn.relu),
-    keras.layers.Dense(2048, activation=tf.nn.relu),
-    keras.layers.Dense(2048, activation=tf.nn.relu),
-    keras.layers.Dense(84, activation=tf.nn.softmax)
-])
+# model = keras.Sequential([
+#     keras.layers.Flatten(input_shape=(100, 100, 6)),
+#     keras.layers.Dense(2048, activation=tf.nn.relu),
+#     keras.layers.Dense(2048, activation=tf.nn.relu),
+#     keras.layers.Dense(2048, activation=tf.nn.relu),
+#     keras.layers.Dense(84, activation=tf.nn.softmax)
+# ])
+
+img_input = keras.layers.Input((100 ,100,3))
+model = keras.Model(inputs = img_input, outputs = resnet.createModel(img_input))
 
 model.compile(optimizer=tf.train.AdamOptimizer(),
               loss='sparse_categorical_crossentropy',
