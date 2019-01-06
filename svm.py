@@ -10,8 +10,9 @@ import keras
 import tensorflow as tf
 import os.path
 import random
-import resnet
 from keras.models import load_model
+from sklearn.svm import SVC  
+
 
 
 def getClassesIds():
@@ -85,10 +86,16 @@ print(max_amplitude, max_phase)
 batch_size=20
 samples = np.ceil(len(files) / batch_size)
 
+resnet_model = load_model('my_model.h5')
+resnet_model.compile(optimizer=tf.train.AdamOptimizer(),
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+svm_model = keras.Model(resnet_model.inputs, resnet_model.layers[-2].output)
+svm_model.summary()
 def generate_arrays_from_files(files2):
     print(len(files2))
     batch_features = np.zeros((batch_size, 100, 100, 3))
-    batch_labels = np.zeros((batch_size, 1))
+    batch_labels = np.zeros((batch_size))
 
     while 1:
         for i in range(batch_size):
@@ -97,60 +104,11 @@ def generate_arrays_from_files(files2):
             #print(file, clas)
             batch_features[i] = preprocess_image(file)
             batch_labels[i] = clas
-        yield (batch_features, batch_labels)
+        yield (svm_model.predict(batch_features), batch_labels)    
 
-
-# model = keras.Sequential([
-#     keras.layers.Flatten(input_shape=(100, 100, 6)),
-#     keras.layers.Dense(2048, activation=tf.nn.relu),
-#     keras.layers.Dense(2048, activation=tf.nn.relu),
-#     keras.layers.Dense(2048, activation=tf.nn.relu),
-#     keras.layers.Dense(84, activation=tf.nn.softmax)
-# ])
-
-img_input = keras.layers.Input((100 ,100,3))
-model = keras.Model(inputs = img_input, outputs = resnet.resnetModel(img_input))
-
-model.compile(optimizer=tf.train.AdamOptimizer(),
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-
-model.summary()
-model.fit_generator(generate_arrays_from_files(files), samples_per_epoch=samples, epochs=1)
-model.save('my_model.h5')
-
-model.compile(optimizer=tf.train.AdamOptimizer(),
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-
-files = readSet('fruits-360/Test')
-test_size = int(len(files)/2)
-test_set = files[:test_size]
-valid_set = files[test_size:]
-
-test_images, test_labels = zip(*test_set)
-
-batch_size=100
-def generate_arrays_from_files():
-    print(len(test_set))
-    i = 0
-    while i < len(files):
-        print(i)
-        batch_features = np.zeros((batch_size, 100, 100, 3))
-        batch_labels = np.zeros((batch_size, 1))
-        j = 0
-        while j < batch_size and i < len(files):
-            file, clas = files[i]
-            batch_features[j] = preprocess_image(file)
-            batch_labels[j] = clas
-            i += 1
-            j += 1
-        yield (batch_features, batch_labels)
-
-test_loss, test_acc = model.evaluate_generator(generate_arrays_from_files(), steps=int(len(files)/batch_size))
-print('Test accuracy:', test_acc)
-
-
-
-
-
+svclassifier = SVC(kernel='poly', degree=8, gamma='scale')
+i = 0
+for (batch_features, batch_labels) in generate_arrays_from_files(files):
+    svclassifier.fit(batch_features, batch_labels)
+    print(i)
+    i += 1

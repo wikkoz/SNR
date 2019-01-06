@@ -71,7 +71,7 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
     x = Activation('relu')(x)
     return x
 
-def createModel(img_input):
+def resnetModel(img_input):
     x = ZeroPadding2D((3, 3))(img_input)
     x = Conv2D(64, (7, 7), strides=(1, 1), name='conv1')(x)
     x = BatchNormalization(axis=3, name='bn_conv1')(x)
