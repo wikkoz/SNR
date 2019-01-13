@@ -103,7 +103,11 @@ def train(args, classesToIds):
     def generate_arrays_from_files(batch_size, files2):
         print(len(files2))
         batch_features = np.zeros((batch_size, args.descriptor_size, args.descriptor_size, 3))
-        batch_labels = np.zeros((batch_size, 84))
+
+        if args.cost_function == 'sparse_categorical_crossentropy':
+            batch_labels = np.zeros((batch_size, 1))
+        else:
+            batch_labels = np.zeros((batch_size, 84))
 
         while 1:
             for i in range(batch_size):
@@ -113,7 +117,10 @@ def train(args, classesToIds):
                 batch_features[i] = preprocess_image(file, args.descriptor_size)
                 if args.augmentation:
                     batch_features[i] = augment(batch_features[i])
-                batch_labels[i] = one_hot_encode(clas)
+                if args.cost_function == 'sparse_categorical_crossentropy':
+                    batch_labels[i] = clas
+                else:
+                    batch_labels[i] = one_hot_encode(clas)
             yield (batch_features, batch_labels)
 
     files = readDataSet('fruits-360/Training', classesToIds)
@@ -123,7 +130,7 @@ def train(args, classesToIds):
     img_input = keras.layers.Input((args.descriptor_size, args.descriptor_size, 3))
     model = keras.Model(inputs=img_input, outputs=resnet.resnetModel(img_input, activation=args.activation_function, cut_layers=args.convolution_layers_cut))
 
-    model.compile(optimizer=tf.train.AdamOptimizer(),
+    model.compile(optimizer=tf.train.AdamOptimizer(learning_rate=args.learning_rate),
                   loss=args.cost_function,
                   metrics=['accuracy'])
 
@@ -138,12 +145,18 @@ def test(args, classesToIds, model = None):
         i = 0
         while i < len(files):
             batch_features = np.zeros((batch_size, args.descriptor_size, args.descriptor_size, 3))
-            batch_labels = np.zeros((batch_size, 84))
+            if args.cost_function == 'sparse_categorical_crossentropy':
+                batch_labels = np.zeros((batch_size, 1))
+            else:
+                batch_labels = np.zeros((batch_size, 84))
             j = 0
             while j < batch_size and i < len(files):
                 file, clas = files[i]
                 batch_features[j] = preprocess_image(file, args.descriptor_size)
-                batch_labels[j] = one_hot_encode(clas)
+                if args.cost_function == 'sparse_categorical_crossentropy':
+                    batch_labels[j] = clas
+                else:
+                    batch_labels[j] = one_hot_encode(clas)
                 i += 1
                 j += 1
             yield (batch_features, batch_labels)
@@ -188,7 +201,7 @@ def main():
     parser.add_argument("-m", "--model", dest="model", default="resNet", help="One of: resNet, SVM")
     parser.add_argument("-desc_size", "--descriptor_size", dest="descriptor_size", type=int, default=100, help="Descriptor size")
     parser.add_argument("-conv_cut", "--convolution_layers_cut", dest="convolution_layers_cut", default=4, type=int, help="Number from 1 to 4")
-    parser.add_argument("-cost_fun", "--cost_function", dest="cost_function", default="mean_squared_error", help="One of: mean_squared_error, mean_absolute_error, binary_crossentropy, cosine_proximity etc")
+    parser.add_argument("-cost_fun", "--cost_function", dest="cost_function", default="mean_squared_error", help="One of: sparse_categorical_crossentropy, mean_squared_error, mean_absolute_error, binary_crossentropy, cosine_proximity etc")
     parser.add_argument("-activ_fun", "--activation_function", dest="activation_function", default="relu",
                         help="One of: relu, sigmoid, elu, softplus")
     parser.add_argument("-aug", "--augmentation", dest="augmentation", default='false', type=str2bool, help="If the data should be augmented")
@@ -196,6 +209,7 @@ def main():
                         help="Batch size")
     parser.add_argument("-only_test", "--only_test", dest="only_test", default=False, help="Test only")
     parser.add_argument("-e", "--epochs", dest="epochs", default=3, type=int, help="Number of epochs")
+    parser.add_argument("-lr", "--learning_rate", dest="learning_rate", default=0.01, type=float, help="Learning rate")
 
     args = parser.parse_args()
 
