@@ -22,14 +22,14 @@ from keras.applications.imagenet_utils import decode_predictions
 from keras.applications.imagenet_utils import preprocess_input
 from keras.engine.topology import get_source_inputs
 
-def identity_block(input_tensor, kernel_size, filters, stage, block):
+def identity_block(input_tensor, kernel_size, filters, stage, block, activation):
     filters1, filters2, filters3 = filters
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
     x = Conv2D(filters1, (1, 1), name=conv_name_base + '2a')(input_tensor)
     x = BatchNormalization(axis=3, name=bn_name_base + '2a')(x)
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
 
     x = Conv2D(filters2, kernel_size,
                padding='same', name=conv_name_base + '2b')(x)
@@ -40,12 +40,12 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
     x = BatchNormalization(axis=3, name=bn_name_base + '2c')(x)
 
     x = layers.add([x, input_tensor])
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
     return x
 
 
 
-def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
+def conv_block(input_tensor, kernel_size, filters, stage, block, activation, strides=(2, 2)):
     filters1, filters2, filters3 = filters
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
@@ -53,12 +53,12 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
     x = Conv2D(filters1, (1, 1), strides=strides,
                name=conv_name_base + '2a')(input_tensor)
     x = BatchNormalization(axis=3, name=bn_name_base + '2a')(x)
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
 
     x = Conv2D(filters2, kernel_size, padding='same',
                name=conv_name_base + '2b')(x)
     x = BatchNormalization(axis=3, name=bn_name_base + '2b')(x)
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
 
     x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
     x = BatchNormalization(axis=3, name=bn_name_base + '2c')(x)
@@ -68,35 +68,39 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
     shortcut = BatchNormalization(axis=3, name=bn_name_base + '1')(shortcut)
 
     x = layers.add([x, shortcut])
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
     return x
 
-def resnetModel(img_input):
+def resnetModel(img_input, activation, cut_layers):
+    print("AAA", activation)
     x = ZeroPadding2D((3, 3))(img_input)
     x = Conv2D(64, (7, 7), strides=(1, 1), name='conv1')(x)
     x = BatchNormalization(axis=3, name='bn_conv1')(x)
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
     x = MaxPooling2D((3, 3), strides=(2, 2))(x)
 
-    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1), activation=activation)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b', activation=activation)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c', activation=activation)
 
-    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+    if cut_layers > 1:
+        x = conv_block(x, 3, [128, 128, 512], stage=3, block='a', activation=activation)
+        x = identity_block(x, 3, [128, 128, 512], stage=3, block='b', activation=activation)
+        x = identity_block(x, 3, [128, 128, 512], stage=3, block='c', activation=activation)
+        x = identity_block(x, 3, [128, 128, 512], stage=3, block='d', activation=activation)
 
-    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
+        if cut_layers > 2:
+            x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a', activation=activation)
+            x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b', activation=activation)
+            x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c', activation=activation)
+            x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d', activation=activation)
+            x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e', activation=activation)
+            x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f', activation=activation)
 
-    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
+            if cut_layers > 3:
+                x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a', activation=activation)
+                x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b', activation=activation)
+                x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c', activation=activation)
 
     x = AveragePooling2D((7, 7), name='avg_pool')(x)
 
