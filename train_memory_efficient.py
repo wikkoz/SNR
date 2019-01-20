@@ -14,6 +14,7 @@ from skimage import transform
 from skimage import util
 from keras import losses
 from skimage.transform import rescale, resize, downscale_local_mean
+from sklearn.svm import SVC
 
 def prepareIds():
     def getClassesIds():
@@ -143,15 +144,15 @@ def test(args, classesToIds, model = None):
     def generate_arrays_from_files():
         print(len(test_set))
         i = 0
-        while i < len(files):
+        while i < len(test_set):
             batch_features = np.zeros((batch_size, args.descriptor_size, args.descriptor_size, 3))
             if args.cost_function == 'sparse_categorical_crossentropy':
                 batch_labels = np.zeros((batch_size, 1))
             else:
                 batch_labels = np.zeros((batch_size, 84))
             j = 0
-            while j < batch_size and i < len(files):
-                file, clas = files[i]
+            while j < batch_size and i < len(test_set):
+                file, clas = test_set[i]
                 batch_features[j] = preprocess_image(file, args.descriptor_size)
                 if args.cost_function == 'sparse_categorical_crossentropy':
                     batch_labels[j] = clas
@@ -176,14 +177,51 @@ def test(args, classesToIds, model = None):
     test_loss, test_acc = model.evaluate_generator(generate_arrays_from_files(), steps=samples)
     print('Test accuracy:', test_acc)
 
+def svm(args, classesToIds):
+
+    resnet_model = keras.models.load_model('best_model.h5')
+    svm_model = keras.Model(resnet_model.inputs, resnet_model.layers[-2].output)
+    svm_model.summary()
+
+    svclassifier = SVC(kernel=args.svm_kernel)
+
+    def generate_arrays_from_files(files3):
+        print(len(files3))
+        order = list(range(0, len(files3)-1))
+        random.shuffle(order)
+        x_data = []
+        y_data = []
+        for i in order:
+            file, clas = files3[i]
+            features = preprocess_image(file, args.descriptor_size)
+            batch_features = np.zeros((1, args.descriptor_size, args.descriptor_size, 3))
+            batch_features[0] = features
+            z = svm_model.predict(batch_features)
+            x_data.append(z[0])
+            y_data.append(clas)
+
+        return x_data, y_data
+
+    files = readDataSet('fruits-360/Training', classesToIds)
+    features, labels = generate_arrays_from_files(files)
+    svclassifier.fit(features, labels)
+
+    files = readDataSet('fruits-360/Test', classesToIds)
+    features, labels = generate_arrays_from_files(files)
+    print("Test SVC accuracy: ", svclassifier.score(features, labels))
+
+
+
 
 def calc_model(args):
     classesToIds, idsToClasses = prepareIds()
-    model = None
-    if not args.only_test:
-        model = train(args, classesToIds)
-    test(args, classesToIds, model)
-
+    if args.model == 'resNet':
+        model = None
+        if not args.only_test:
+            model = train(args, classesToIds)
+        test(args, classesToIds, model)
+    else:
+        train_svm(args, classesToIds)
     pass
 
 def str2bool(v):
@@ -210,6 +248,7 @@ def main():
     parser.add_argument("-only_test", "--only_test", dest="only_test", default=False, help="Test only")
     parser.add_argument("-e", "--epochs", dest="epochs", default=3, type=int, help="Number of epochs")
     parser.add_argument("-lr", "--learning_rate", dest="learning_rate", default=0.01, type=float, help="Learning rate")
+    parser.add_argument("-svm_k", "--svm_kernel", dest="svm_kernel", default="linear", help="One of: linear, poly, rbf, sigmoid")
 
     args = parser.parse_args()
 
